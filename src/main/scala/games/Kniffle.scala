@@ -61,9 +61,8 @@ object Kniffle extends App {
   case class HandLine[T <: Outcome](outcome: T, rollResult: Option[FiveDice])
   object HandLine {
     def empty[T <: Outcome]()(implicit t: T) = HandLine(t, None)
-
   }
-  //make custom type with type param
+
   case class Hand(
       ones: HandLine[Ones.type],
       twos: HandLine[Twos.type],
@@ -78,6 +77,7 @@ object Kniffle extends App {
       fourStraight: HandLine[FourStraight.type],
       chance: HandLine[Chance.type]
   )
+
   object Hand {
     def empty() = new Hand(
       HandLine.empty[Ones.type],
@@ -101,7 +101,8 @@ object Kniffle extends App {
   case class PlayerState(name: String, hand: Hand)
   case class State(players: List[PlayerState]) {
     val repeat = players.map(_.name).toStream
-    val b: Stream[String] = repeat #:: b
+    val playerStream: Stream[String] = repeat #::: playerStream
+    val playerIter = playerStream.iterator
     }
 
   val kniffleGame: IO[IOException, Unit] =
@@ -124,7 +125,10 @@ object Kniffle extends App {
     for {
       _ <- putStrLn("your turn")
       roll <- rollDie
-      currentPlayer = state.players.head.name
+      currentPlayer = state.playerIter.next
+      _ <- putStrLn(s"current player is $currentPlayer")
+      a <- getStrLn
+      _ <- gameLoop(state)
     } yield (state)
 
 
