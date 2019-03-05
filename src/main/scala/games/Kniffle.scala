@@ -35,7 +35,7 @@ object Kniffle extends App {
 
   case class FiveDice(d1: Die, d2: Die, d3: Die, d4: Die, d5: Die)
 
-    def multDie(d: Die, roll: FiveDice) =
+    def countDieMatches(d: Die, roll: FiveDice) =
           Generic[FiveDice]
             .to(roll)
             .toList
@@ -121,13 +121,40 @@ object Kniffle extends App {
       _ => ExitStatus.ExitNow(0)
     )
 
+
+  def toDie(s: String): Option[Die] = s match {
+    case "1" => Some(One)
+    case "2" => Some(Two)
+    case "3" => Some(Three)
+    case "4" => Some(Four)
+    case "5" => Some(Five)
+    case "6" => Some(Six)
+    case _   => None
+  }
+
+  def parseRetainString(retain: String): Option[FiveDice] = {
+    val list = retain.split(",").toList
+    val die0: Option[Die] = list.lift(0).flatMap(toDie)
+    val die1: Option[Die] = list.lift(1).flatMap(toDie)
+    val die2: Option[Die] = list.lift(2).flatMap(toDie)
+    val die3: Option[Die] = list.lift(3).flatMap(toDie)
+    val die4: Option[Die] = list.lift(4).flatMap(toDie)
+    val die5: Option[Die] = list.lift(5).flatMap(toDie)
+    (die0 |@| die1 |@| die2 |@| die3 |@| die4)(FiveDice.apply)
+  }
+
+  private def rollLoop(roll: FiveDice, turnsTaken: Int): IO[IOException, Assignment] = for {
+    retain <- putStrLn(s"current player is $currentPlayer") *>
+     putStrLn(s"your roll is $roll") *>
+     putStrLn(s"which dice would you like to keep? ") *>
+     getStrLn
+  } yield()
+
   private def gameLoop(state: State): IO[IOException, State] =
     for {
       _ <- putStrLn("your turn")
-      roll <- rollDie
+      roll <- rollDice
       currentPlayer = state.playerIter.next
-      _ <- putStrLn(s"current player is $currentPlayer")
-      a <- getStrLn
       _ <- gameLoop(state)
     } yield (state)
 
