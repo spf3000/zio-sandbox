@@ -132,16 +132,16 @@ object Kniffle extends App {
     case _   => None
   }
 
-  def parseRetainString(retain: String): Option[FiveDice] = {
+  def parseRetainString(retain: String, lastRoll: FiveDice): Option[FiveDice] = {
     val list = retain.split(",").toList
     val die0: Option[Die] = list.lift(0).flatMap(toDie)
     val die1: Option[Die] = list.lift(1).flatMap(toDie)
     val die2: Option[Die] = list.lift(2).flatMap(toDie)
     val die3: Option[Die] = list.lift(3).flatMap(toDie)
     val die4: Option[Die] = list.lift(4).flatMap(toDie)
-    val die5: Option[Die] = list.lift(5).flatMap(toDie)
     (die0 |@| die1 |@| die2 |@| die3 |@| die4)(FiveDice.apply)
   }
+  //TODO take intersection with old dice
 
   private def rollLoop(roll: FiveDice, turnsTaken: Int): IO[IOException, Assignment] = for {
     retain <- putStrLn(s"current player is $currentPlayer") *>
