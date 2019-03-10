@@ -99,11 +99,11 @@ object Kniffle extends App {
   //TODO make constructor for emptyHand
 
   case class PlayerState(name: String, hand: Hand)
-  case class State(players: List[PlayerState]) {
-    val repeat = players.map(_.name).toStream
-    val playerStream: Stream[String] = repeat #::: playerStream
-    val playerIter = playerStream.iterator
-    }
+
+  case class State(players: List[PlayerState])
+
+  def advancePlayer(state: State): State =
+    State(state.players.tail :+ state.players.head)
 
   val kniffleGame: IO[IOException, Unit] =
     for {
@@ -132,30 +132,77 @@ object Kniffle extends App {
     case _   => None
   }
 
-  def parseRetainString(retain: String, lastRoll: FiveDice): Option[FiveDice] = {
-    val list = retain.split(",").toList
-    val die0: Option[Die] = list.lift(0).flatMap(toDie)
-    val die1: Option[Die] = list.lift(1).flatMap(toDie)
-    val die2: Option[Die] = list.lift(2).flatMap(toDie)
-    val die3: Option[Die] = list.lift(3).flatMap(toDie)
-    val die4: Option[Die] = list.lift(4).flatMap(toDie)
-    (die0 |@| die1 |@| die2 |@| die3 |@| die4)(FiveDice.apply)
+  def getDie(r: String, roll: List[Die]): Option[List[Die]] =
+    for {
+      d <- toDie(r)
+      c <- rollContains(d, roll)
+    } yield(c)
+
+  def rollContains(die: Die, roll: List[Die]): Option[List[Die]] =
+    roll
+      .contains(die) match {
+        case false => None
+        case true => Some(roll.tail)
+      }
+
+
+
+  def parseRetainString(retain: String): Reader[FiveDice, Option[List[Die]]] = Reader {
+    roll => {
+      val rollList: List[Die] =
+        Generic[FiveDice]
+          .to(roll)
+          .toList
+
+    val retainedDice: String => Option[List[Die]] =
+      _.split(",")
+        .toList
+        .map(toDie)
+        .sequence
+
+    val isValidRetainment: List[Die] => Option[List[Die]] =
+      retain => {
+        val dieCounts: List[Die] => Map[Die,Int] = _.groupBy(identity).mapValues(_.length)
+        val retVals = dieCounts(retain)
+        val rollVals = dieCounts(rollList)
+        retVals.keys.forall(x => retVals(x) <= rollVals(x)).option(retain)
+      }
+
+    val getRetained = Kleisli(retainedDice) >=> Kleisli(isValidRetainment)
+    getRetained(retain)
+
+    }
   }
   //TODO take intersection with old dice
 
-  private def rollLoop(roll: FiveDice, turnsTaken: Int): IO[IOException, Assignment] = for {
-    retain <- putStrLn(s"current player is $currentPlayer") *>
-     putStrLn(s"your roll is $roll") *>
+  case class Assignment(roll: FiveDice, outcome: Outcome)
+
+  private def getRetained(roll: FiveDice, turnsTaken: Int, currentPlayer: String): IO[IOException, FiveDice] =
+    for {
+    retainStr <- putStrLn(s"your roll is $roll") *>
      putStrLn(s"which dice would you like to keep? ") *>
      getStrLn
-  } yield()
+    retained <- parseRetainString(retainStr) match {
+      case None => putStrLn("you need to retain 5 dice") *>
+        getRetained(roll, turnsTaken, currentPlayer)
+      case Some(fd) => IO.now(fd)
+    }
+  } yield(retained)
+
+  private def rollLoop(currentPlayer: String): IO[IOException, Unit] =
+    for {
+      _ <- putStrLn(s"current player is $currentPlayer")
+      roll <- rollDice
+      retained <- getRetained(roll, 0, currentPlayer)
+    } yield()
+
 
   private def gameLoop(state: State): IO[IOException, State] =
     for {
       _ <- putStrLn("your turn")
-      roll <- rollDice
-      currentPlayer = state.playerIter.next
-      _ <- gameLoop(state)
+      currentPlayer = state.players.head
+      _ <- rollLoop(currentPlayer.name)
+      _ <- gameLoop(advancePlayer(state))
     } yield (state)
 
 
@@ -163,6 +210,7 @@ object Kniffle extends App {
   def nextInt(max: Int): IO[Nothing, Int] =
     IO.sync(Random.nextInt(max))
 
+  //TODO accept an n: Int that is the number of dice you want rolled
   private val rollDice: IO[Nothing, FiveDice] =
     IO.traverse(List(0,1,2,3,4))(_ => rollDie).map(l =>
         FiveDice(l(0), l(1), l(2), l(3), l(4)))
