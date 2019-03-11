@@ -182,7 +182,7 @@ object Kniffle extends App {
     retainStr <- putStrLn(s"your roll is $roll") *>
      putStrLn(s"which dice would you like to keep? ") *>
      getStrLn
-    retained <- parseRetainString(retainStr) match {
+    retained <- parseRetainString(retainStr).run(roll) match {
       case None => putStrLn("you need to retain 5 dice") *>
         getRetained(roll, turnsTaken, currentPlayer)
       case Some(fd) => IO.now(fd)
@@ -192,7 +192,7 @@ object Kniffle extends App {
   private def rollLoop(currentPlayer: String): IO[IOException, Unit] =
     for {
       _ <- putStrLn(s"current player is $currentPlayer")
-      roll <- rollDice
+      roll <- rollDice(5)
       retained <- getRetained(roll, 0, currentPlayer)
     } yield()
 
@@ -210,11 +210,9 @@ object Kniffle extends App {
   def nextInt(max: Int): IO[Nothing, Int] =
     IO.sync(Random.nextInt(max))
 
-  //TODO accept an n: Int that is the number of dice you want rolled
-  private val rollDice: IO[Nothing, FiveDice] =
-    IO.traverse(List(0,1,2,3,4))(_ => rollDie).map(l =>
-        FiveDice(l(0), l(1), l(2), l(3), l(4)))
-
+  //TODO should return an HList
+  private val rollDice: Int => IO[Nothing, List[Die]] =
+    n => IO.traverse(List.fill(n)(true))(_ => rollDie)
 
   private def rollDie(): IO[Nothing, Die] = nextInt(5).map(_ + 1).map(_ match {
     case 1 => One
