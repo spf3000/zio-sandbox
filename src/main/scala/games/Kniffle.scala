@@ -147,6 +147,7 @@ object Kniffle extends App {
 
 
 
+  //TODO needs to return an Option[FiveDice]
   def parseRetainString(retain: String): Reader[FiveDice, Option[List[Die]]] = Reader {
     roll => {
       val rollList: List[Die] =
@@ -192,7 +193,7 @@ object Kniffle extends App {
   private def rollLoop(currentPlayer: String): IO[IOException, Unit] =
     for {
       _ <- putStrLn(s"current player is $currentPlayer")
-      roll <- rollDice(5)
+      roll <- rollDice
       retained <- getRetained(roll, 0, currentPlayer)
     } yield()
 
@@ -206,15 +207,20 @@ object Kniffle extends App {
     } yield (state)
 
 
-  //TODO move to common code
   def nextInt(max: Int): IO[Nothing, Int] =
     IO.sync(Random.nextInt(max))
 
-  //TODO should return an HList
-  private val rollDice: Int => IO[Nothing, List[Die]] =
-    n => IO.traverse(List.fill(n)(true))(_ => rollDie)
+  private val rollNDice: Int => IO[Nothing, List[Die]] =
+    n => IO.traverse(List.fill(2)(true))(_ => rollDie)
 
-  private def rollDie(): IO[Nothing, Die] = nextInt(5).map(_ + 1).map(_ match {
+  private val rollDice: IO[Nothing, FiveDice] = {
+    IO.traverse(List.fill(5)(true))(_ => rollDie).map{ l =>
+    (l.lift(0) |@| l.lift(1) |@| l.lift(2) |@| l.lift(3) |@| l.lift(4))(FiveDice.apply).get
+    }
+  }
+
+
+  private def rollDie: IO[Nothing, Die] = nextInt(5).map(_ + 1).map(_ match {
     case 1 => One
     case 2 => Two
     case 3 => Three
