@@ -27,8 +27,6 @@ import scala.util.Random
   */
 object Hangman extends App {
 
-
-
   case class State(name: String, guesses: Set[Char], word: String) {
     final val failures: Int       = (guesses -- word.toSet).length
     final val playerLost: Boolean = failures > 7
@@ -45,10 +43,11 @@ object Hangman extends App {
     for {
       r <- newRandom
       i <- IO.sync(r.nextInt(max))
-    } yield(i)
+    } yield (i)
 
   val chooseWord: IO[Nothing, String] =
-    nextInt(Dictionary.length).map(int => Random.shuffle(Dictionary).lift(int).getOrElse("bug in the program"))
+    nextInt(Dictionary.length).map(int =>
+      Random.shuffle(Dictionary).lift(int).getOrElse("bug in the program"))
 
   val hangmanGame: IO[IOException, Unit] =
     for {
@@ -82,7 +81,8 @@ object Hangman extends App {
         putStrLn(s"Congratulations, ${state.name}, you won the game!!!")
           .const(false)
       else if (state.playerLost)
-        putStrLn(s"Sorry, ${state.name}, you lost the game. The word was ${state.word}").const(false)
+        putStrLn(s"Sorry, ${state.name}, you lost the game. The word was ${state.word}")
+          .const(false)
       else if (state.word.contains(guess))
         putStrLn(s"You guessed correctly, ${state.name}, keep going!")
           .const(true)
@@ -124,96 +124,118 @@ object Hangman extends App {
       _ => ExitStatus.ExitNow(1),
       _ => ExitStatus.ExitNow(0)
     )
-lazy val Dictionary = List("great", "british", "bake", "off", "salt", "fat", "acid", "heat", "one", "punch", "man",
-    "wrinkle", "face", "hat",
- "cinnamon", "scaffold", "wonderful", "egregious", "plentiful", "bacon", "knife", "eucalyptus", "treasure", "femur"
-,"acres"
-,"adult"
-,"advice"
-,"arrangement"
-,"attempt"
-,"August"
-,"Autumn"
-,"border"
-,"breeze"
-,"brick"
-,"calm"
-,"canal"
-,"Casey"
-,"cast"
-,"chose"
-,"claws"
-,"coach"
-,"constantly"
-,"contrast"
-,"cookies"
-,"customs"
-,"damage"
-,"Danny"
-,"deeply"
-,"depth"
-,"discussion"
-,"doll"
-,"donkey"
-,"Egypt"
-,"Ellen"
-,"essential"
-,"exchange"
-,"exist"
-,"explanation"
-,"facing"
-,"film"
-,"finest"
-,"fireplace"
-,"floating"
-,"folks"
-,"fort"
-,"garage"
-,"grabbed"
-,"grandmother"
-,"habit"
-,"happily"
-,"Harry"
-,"heading"
-,"hunter"
-,"Illinois"
-,"image"
-,"independent"
-,"instant"
-,"January"
-,"kids"
-,"label"
-,"Lee"
-,"lungs"
-,"manufacturing"
-,"Martin"
-,"mathematics"
-,"melted"
-,"memory"
-,"mill"
-,"mission"
-,"monkey"
-,"Mount"
-,"mysterious"
-,"neighborhood"
-,"Norway"
-,"nuts"
-,"occasionally"
-,"official"
-,"ourselves"
-,"palace"
-,"Pennsylvania"
-,"Philadelphia"
-,"plates"
-,"poetry"
-,"policeman"
-,"positive"
-,"possibly"
-,"practical"
-,"pride"
-,"promised"
-,"recall"
-,"relationship"
-,"remarkable"
-)
+  lazy val Dictionary = List(
+    "great",
+    "british",
+    "bake",
+    "off",
+    "salt",
+    "fat",
+    "acid",
+    "heat",
+    "one",
+    "punch",
+    "man",
+    "wrinkle",
+    "face",
+    "hat",
+    "cinnamon",
+    "scaffold",
+    "wonderful",
+    "egregious",
+    "plentiful",
+    "bacon",
+    "knife",
+    "eucalyptus",
+    "treasure",
+    "femur",
+    "acres",
+    "adult",
+    "advice",
+    "arrangement",
+    "attempt",
+    "August",
+    "Autumn",
+    "border",
+    "breeze",
+    "brick",
+    "calm",
+    "canal",
+    "Casey",
+    "cast",
+    "chose",
+    "claws",
+    "coach",
+    "constantly",
+    "contrast",
+    "cookies",
+    "customs",
+    "damage",
+    "Danny",
+    "deeply",
+    "depth",
+    "discussion",
+    "doll",
+    "donkey",
+    "Egypt",
+    "Ellen",
+    "essential",
+    "exchange",
+    "exist",
+    "explanation",
+    "facing",
+    "film",
+    "finest",
+    "fireplace",
+    "floating",
+    "folks",
+    "fort",
+    "garage",
+    "grabbed",
+    "grandmother",
+    "habit",
+    "happily",
+    "Harry",
+    "heading",
+    "hunter",
+    "Illinois",
+    "image",
+    "independent",
+    "instant",
+    "January",
+    "kids",
+    "label",
+    "Lee",
+    "lungs",
+    "manufacturing",
+    "Martin",
+    "mathematics",
+    "melted",
+    "memory",
+    "mill",
+    "mission",
+    "monkey",
+    "Mount",
+    "mysterious",
+    "neighborhood",
+    "Norway",
+    "nuts",
+    "occasionally",
+    "official",
+    "ourselves",
+    "palace",
+    "Pennsylvania",
+    "Philadelphia",
+    "plates",
+    "poetry",
+    "policeman",
+    "positive",
+    "possibly",
+    "practical",
+    "pride",
+    "promised",
+    "recall",
+    "relationship",
+    "remarkable"
+  )
 }

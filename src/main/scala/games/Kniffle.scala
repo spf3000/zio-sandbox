@@ -35,28 +35,48 @@ object Kniffle extends App {
 
   case class FiveDice(d1: Die, d2: Die, d3: Die, d4: Die, d5: Die)
 
-    def countDieMatches(d: Die, roll: FiveDice) =
-          Generic[FiveDice]
-            .to(roll)
-            .toList
-            .count(_ == d)
+  def countMatchingDice(f: Die => Boolean): FiveDice => Int = {
+    roll  =>
+    Generic[FiveDice]
+      .to(roll)
+      .toList
+      .count(f(_))
+  }
+
+  def countDieMatches(d: Die): FiveDice => Int = countMatchingDice(_ == d)
+
+  def containsNOfKind(n: Int): FiveDice => Boolean = {
+    roll => Generic[FiveDice]
+      .to(roll)
+      .toList
+      .groupBy(identity)
+      .values
+      .map(_.length)
+      .toList
+      .exists(_ >= n)
+  }
 
 
+
+  def sumIfPredicate(cond: FiveDice => Boolean): FiveDice => Int =
+    roll => if(cond(roll)) countMatchingDice(_ => true)(roll) else 0
+
+  def ofKindScore(n: Int): FiveDice => Int = (sumIfPredicate _ compose containsNOfKind)(n)
+  def straightScore(n: Int): FiveDice => Int = (sumIfPredicate _ compose containsNOfStraight)(n)
 
   sealed trait Outcome
-  implicit case object Ones extends Outcome
-  implicit case object Twos extends Outcome
-  implicit case object Threes extends Outcome
-  implicit case object Fours extends Outcome
-  implicit case object Fives extends Outcome
-  implicit case object Sixes extends Outcome
-  implicit case object ThreeOfKind extends Outcome
-  implicit case object FourOfKind extends Outcome
-  implicit case object FiveOfKind extends Outcome
-  implicit case object ThreeStraight extends Outcome
-  implicit case object FourStraight extends Outcome
-  implicit case object Chance extends Outcome
-
+  def ones:        FiveDice => Int = countDieMatches(One)
+  def twos:        FiveDice => Int = countDieMatches(Two)
+  def threes:      FiveDice => Int = countDieMatches(Three)
+  def fours:       FiveDice => Int = countDieMatches(Four)
+  def fives:       FiveDice => Int = countDieMatches(Five)
+  def sixes:       FiveDice => Int = countDieMatches(Six)
+  def threeOfKind: FiveDice => Int = ofKindScore(3)
+  def fourOfKind:  FiveDice => Int = ofKindScore(4)
+  def fiveOfKind:  FiveDice => Int = ofKindScore(5)
+  def threeStraight
+  def fourStraight  
+  def chance: FiveDice => Int = countMatchingDice(_ => true)
 
   case class HandLine[T <: Outcome](outcome: T, rollResult: Option[FiveDice])
   object HandLine {
@@ -92,7 +112,7 @@ object Kniffle extends App {
       HandLine.empty[ThreeStraight.type],
       HandLine.empty[FourStraight.type],
       HandLine.empty[Chance.type],
-      )
+    )
 
   }
 
@@ -110,7 +130,7 @@ object Kniffle extends App {
       _               <- putStrLn("Functional Kniffle")
       numberOfPlayers <- getNumberPlayers
       playerNames     <- getPlayerNames(numberOfPlayers)
-      state = State(playerNames.map(name =>  PlayerState(name, Hand.empty)))
+      state = State(playerNames.map(name => PlayerState(name, Hand.empty)))
       _ <- renderState(state)
       _ <- gameLoop(state)
     } yield ()
@@ -120,7 +140,6 @@ object Kniffle extends App {
       _ => ExitStatus.ExitNow(1),
       _ => ExitStatus.ExitNow(0)
     )
-
 
   def toDie(s: String): Option[Die] = s match {
     case "1" => Some(One)
@@ -136,67 +155,66 @@ object Kniffle extends App {
     for {
       d <- toDie(r)
       c <- rollContains(d, roll)
-    } yield(c)
+    } yield (c)
 
   def rollContains(die: Die, roll: List[Die]): Option[List[Die]] =
     roll
       .contains(die) match {
-        case false => None
-        case true => Some(roll.tail)
-      }
-
-
+      case false => None
+      case true  => Some(roll.tail)
+    }
 
   //TODO needs to return an Option[FiveDice]
-  def parseRetainString(retain: String): Reader[FiveDice, Option[List[Die]]] = Reader {
-    roll => {
+  def parseRetainString(retain: String): Reader[FiveDice, Option[List[Die]]] = Reader { roll =>
+    {
       val rollList: List[Die] =
         Generic[FiveDice]
           .to(roll)
           .toList
 
-    val retainedDice: String => Option[List[Die]] =
-      _.split(",")
-        .toList
-        .map(toDie)
-        .sequence
+      val retainedDice: String => Option[List[Die]] =
+        _.split(",").toList
+          .map(toDie)
+          .sequence
 
-    val isValidRetainment: List[Die] => Option[List[Die]] =
-      retain => {
-        val dieCounts: List[Die] => Map[Die,Int] = _.groupBy(identity).mapValues(_.length)
-        val retVals = dieCounts(retain)
-        val rollVals = dieCounts(rollList)
-        retVals.keys.forall(x => retVals(x) <= rollVals(x)).option(retain)
-      }
+      val isValidRetainment: List[Die] => Option[List[Die]] =
+        retain => {
+          val dieCounts: List[Die] => Map[Die, Int] = _.groupBy(identity).mapValues(_.length)
+          val retVals                               = dieCounts(retain)
+          val rollVals                              = dieCounts(rollList)
+          retVals.keys.forall(x => retVals(x) <= rollVals(x)).option(retain)
+        }
 
-    val getRetained = Kleisli(retainedDice) >=> Kleisli(isValidRetainment)
-    getRetained(retain)
-
+      val getRetained: String => Option[List[Die]] = Kleisli(retainedDice) >=> Kleisli(
+        isValidRetainment)
+      getRetained(retain)
     }
   }
   //TODO take intersection with old dice
 
   case class Assignment(roll: FiveDice, outcome: Outcome)
 
-  private def getRetained(roll: FiveDice, turnsTaken: Int, currentPlayer: String): IO[IOException, FiveDice] =
+  private def getRetained(roll: FiveDice,
+                          turnsTaken: Int,
+                          currentPlayer: String): IO[IOException, FiveDice] =
     for {
-    retainStr <- putStrLn(s"your roll is $roll") *>
-     putStrLn(s"which dice would you like to keep? ") *>
-     getStrLn
-    retained <- parseRetainString(retainStr).run(roll) match {
-      case None => putStrLn("you need to retain 5 dice") *>
-        getRetained(roll, turnsTaken, currentPlayer)
-      case Some(fd) => IO.now(fd)
-    }
-  } yield(retained)
+      retainStr <- putStrLn(s"your roll is $roll") *>
+        putStrLn(s"which dice would you like to keep? ") *>
+        getStrLn
+      retained <- parseRetainString(retainStr).run(roll) match {
+        case None =>
+          putStrLn("you need to retain 5 dice") *>
+            getRetained(roll, turnsTaken, currentPlayer)
+        case Some(fd) => IO.now(fd)
+      }
+    } yield (retained)
 
   private def rollLoop(currentPlayer: String): IO[IOException, Unit] =
     for {
-      _ <- putStrLn(s"current player is $currentPlayer")
-      roll <- rollDice
+      _        <- putStrLn(s"current player is $currentPlayer")
+      roll     <- roll5Dice
       retained <- getRetained(roll, 0, currentPlayer)
-    } yield()
-
+    } yield ()
 
   private def gameLoop(state: State): IO[IOException, State] =
     for {
@@ -206,31 +224,24 @@ object Kniffle extends App {
       _ <- gameLoop(advancePlayer(state))
     } yield (state)
 
-
   def nextInt(max: Int): IO[Nothing, Int] =
     IO.sync(Random.nextInt(max))
 
-  private val rollNDice: Int => IO[Nothing, List[Die]] =
-    n => IO.traverse(List.fill(2)(true))(_ => rollDie)
+  private val rollNDice: Nat => IO[Nothing, List[Die]] =
+    n => IO.traverse(Tuple.fill(n)("hello"))(_ => rollDie)
 
-  private val rollDice: IO[Nothing, FiveDice] = {
-    IO.traverse(List.fill(5)(true))(_ => rollDie).map{ l =>
-    (l.lift(0) |@| l.lift(1) |@| l.lift(2) |@| l.lift(3) |@| l.lift(4))(FiveDice.apply).get
-    }
-  }
-
-
-  private def rollDie: IO[Nothing, Die] = nextInt(5).map(_ + 1).map(_ match {
-    case 1 => One
-    case 2 => Two
-    case 3 => Three
-    case 4 => Four
-    case 5 => Five
-    case 6 => Six
-  })
-
-
-
+  // could we use narrow?
+  private def rollDie: IO[Nothing, Die] =
+    nextInt(5)
+      .map(_ + 1)
+      .map(_ match {
+        case 1 => One
+        case 2 => Two
+        case 3 => Three
+        case 4 => Four
+        case 5 => Five
+        case 6 => Six
+      })
 
   private def renderState(state: State): IO[IOException, Unit] = {
     for {
@@ -243,7 +254,7 @@ object Kniffle extends App {
       ans <- putStrLn("How many players?") *> getStrLn
       val answer = ans.toInt // TODO this is unsafe
       loop <- if (answer > 0 && answer <= 10) IO.now(false) else IO.now(true)
-      ans <- if (loop) getNumberPlayers else IO.now(answer)
+      ans  <- if (loop) getNumberPlayers else IO.now(answer)
     } yield (ans.toInt)
 
   private def getName(n: Int): IO[IOException, String] =
