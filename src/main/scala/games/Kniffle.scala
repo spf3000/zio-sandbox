@@ -8,6 +8,8 @@ import Scalaz._
 import scalaz.zio._
 import scalaz.zio.console._
 import shapeless._
+import shapeless.labelled.field
+import shapeless.syntax.singleton._
 //import scalaz.zio.interop.scalaz72._
 
 import scala.language.higherKinds
@@ -33,6 +35,17 @@ object Kniffle extends App {
   case object Five  extends Die
   case object Six   extends Die
 
+  trait Kie
+  val _1 = field[Kie](1)
+  val _2 = field[Kie](2)
+  val _3 = field[Kie](3)
+  val _4 = field[Kie](4)
+  val _5 = field[Kie](5)
+  val _6 = field[Kie](6)
+
+  def kId(x: Kie): Boolean = x > 2
+
+  //TODO use sized for 5dice and nDice
   case class FiveDice(d1: Die, d2: Die, d3: Die, d4: Die, d5: Die)
 
   def countMatchingDice(f: Die => Boolean): FiveDice => Int = {
@@ -62,7 +75,7 @@ object Kniffle extends App {
     roll => if(cond(roll)) countMatchingDice(_ => true)(roll) else 0
 
   def ofKindScore(n: Int): FiveDice => Int = (sumIfPredicate _ compose containsNOfKind)(n)
-  def straightScore(n: Int): FiveDice => Int = (sumIfPredicate _ compose containsNOfStraight)(n)
+  //def straightScore(n: Int): FiveDice => Int = (sumIfPredicate _ compose containsNOfStraight)(n)
 
   sealed trait Outcome
   def ones:        FiveDice => Int = countDieMatches(One)
@@ -74,8 +87,8 @@ object Kniffle extends App {
   def threeOfKind: FiveDice => Int = ofKindScore(3)
   def fourOfKind:  FiveDice => Int = ofKindScore(4)
   def fiveOfKind:  FiveDice => Int = ofKindScore(5)
-  def threeStraight
-  def fourStraight  
+ // def threeStraight
+ // def fourStraight  
   def chance: FiveDice => Int = countMatchingDice(_ => true)
 
   case class HandLine[T <: Outcome](outcome: T, rollResult: Option[FiveDice])
