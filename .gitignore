@@ -2,4 +2,7 @@
 .idea/
 project/target/
 target/
+coursier
+.bloop/
+.metals/
 
